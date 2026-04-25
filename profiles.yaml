@@ -1,0 +1,69 @@
+# secscore profiles.yaml
+#
+# services:
+#   match       — substring in container name or image (case-insensitive)
+#   type        — admin | infra | app
+#   http        — true if service speaks HTTP (for auth probing)
+#   behind_proxy — true = service is intentionally behind a reverse proxy.
+#                  If set, public binding is downgraded from CRITICAL→INFO.
+#
+# proxy_names   — container name/image substrings that are known reverse proxies.
+#                 Ports they publish are treated as intentionally public.
+#
+# ignore_sysctl — sysctl keys to skip (e.g. ip_forward on a VPN/WSL host)
+
+services:
+  - match: "zabbix-server"
+    type: "admin"
+    http: false
+
+  - match: "zabbix"
+    type: "admin"
+    http: true
+
+  - match: "grafana"
+    type: "admin"
+    http: true
+
+  - match: "portainer"
+    type: "admin"
+    http: true
+    behind_proxy: true
+
+  - match: "n8n"
+    type: "admin"
+    http: true
+    behind_proxy: true
+
+  - match: "postgres"
+    type: "infra"
+    http: false
+
+  - match: "redis"
+    type: "infra"
+    http: false
+
+  - match: "mysql"
+    type: "infra"
+    http: false
+
+  - match: "mongo"
+    type: "infra"
+    http: false
+
+  - match: "pocketbase"
+    type: "infra"
+    http: true
+
+proxy_names:
+  - "tollgate"
+  - "nginx"
+  - "traefik"
+  - "caddy"
+  - "envoy"
+  - "haproxy"
+
+# sysctl keys to not flag — add here if you know why they're set
+ignore_sysctl:
+  - "net.ipv4.ip_forward"        # WSL2 / VPN gateway host
+  - "net.ipv6.conf.all.forwarding"

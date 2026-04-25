@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build binaries
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags "-X secscore/internal/version.Version=${VERSION}" \
+            -o dist/secscore-linux-amd64 ./cmd/secscore
+
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags "-X secscore/internal/version.Version=${VERSION}" \
+            -o dist/secscore-linux-arm64 ./cmd/secscore
+
+          GOOS=darwin GOARCH=amd64 go build \
+            -ldflags "-X secscore/internal/version.Version=${VERSION}" \
+            -o dist/secscore-darwin-amd64 ./cmd/secscore
+
+          GOOS=darwin GOARCH=arm64 go build \
+            -ldflags "-X secscore/internal/version.Version=${VERSION}" \
+            -o dist/secscore-darwin-arm64 ./cmd/secscore
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum secscore-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "secscore ${{ github.ref_name }}"
+          body: |
+            ## secscore ${{ github.ref_name }}
+
+            ### Install
+
+            ```bash
+            # Linux amd64
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/secscore-linux-amd64 -o secscore
+            chmod +x secscore
+            sudo ./secscore
+            ```
+
+            ### Verify checksum
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/checksums.txt | sha256sum -c
+            ```
+          files: |
+            dist/secscore-linux-amd64
+            dist/secscore-linux-arm64
+            dist/secscore-darwin-amd64
+            dist/secscore-darwin-arm64
+            dist/checksums.txt
+          draft: false
+          prerelease: false
