@@ -8,12 +8,13 @@ import (
 
 type SysctlRule struct{}
 
-func NewSysctlRule() *SysctlRule  { return &SysctlRule{} }
+func NewSysctlRule() *SysctlRule   { return &SysctlRule{} }
 func (r *SysctlRule) Name() string { return "sysctl" }
 
 type sysctlCheck struct {
 	key      string
 	badVal   string
+	goodVal  string
 	severity model.Severity
 	title    string
 	desc     string
@@ -23,15 +24,15 @@ type sysctlCheck struct {
 
 var sysctlChecks = []sysctlCheck{
 	{
-		key: "net.ipv4.ip_forward", badVal: "1",
+		key: "net.ipv4.ip_forward", badVal: "1", goodVal: "0",
 		severity: model.SeverityWarning,
 		title:    "IP forwarding enabled (net.ipv4.ip_forward=1)",
 		desc:     "Host forwards packets — unexpected on a non-router/non-VPN server.",
-		fix:      "sysctl -w net.ipv4.ip_forward=0  (or add to ignore_sysctl in profiles.yaml if this is a VPN/WSL host)",
+		fix:      "sysctl -w net.ipv4.ip_forward=0  (add to ignore_sysctl in profiles.yaml if VPN/WSL host)",
 		penalty:  10,
 	},
 	{
-		key: "kernel.dmesg_restrict", badVal: "0",
+		key: "kernel.dmesg_restrict", badVal: "0", goodVal: "1",
 		severity: model.SeverityWarning,
 		title:    "dmesg unrestricted (kernel.dmesg_restrict=0)",
 		desc:     "Any local user can read kernel ring buffer — may leak sensitive addresses.",
@@ -39,7 +40,7 @@ var sysctlChecks = []sysctlCheck{
 		penalty:  5,
 	},
 	{
-		key: "kernel.kptr_restrict", badVal: "0",
+		key: "kernel.kptr_restrict", badVal: "0", goodVal: "2",
 		severity: model.SeverityWarning,
 		title:    "Kernel pointer exposure (kernel.kptr_restrict=0)",
 		desc:     "Kernel symbol addresses visible to unprivileged users.",
@@ -47,7 +48,7 @@ var sysctlChecks = []sysctlCheck{
 		penalty:  5,
 	},
 	{
-		key: "fs.suid_dumpable", badVal: "2",
+		key: "fs.suid_dumpable", badVal: "2", goodVal: "0",
 		severity: model.SeverityWarning,
 		title:    "Core dumps for setuid programs (fs.suid_dumpable=2)",
 		desc:     "setuid programs can dump core, potentially leaking sensitive data.",
@@ -55,7 +56,7 @@ var sysctlChecks = []sysctlCheck{
 		penalty:  5,
 	},
 	{
-		key: "net.ipv4.conf.all.accept_redirects", badVal: "1",
+		key: "net.ipv4.conf.all.accept_redirects", badVal: "1", goodVal: "0",
 		severity: model.SeverityWarning,
 		title:    "ICMP redirects accepted",
 		desc:     "Host accepts ICMP redirects — can be used for MITM attacks.",
@@ -63,7 +64,7 @@ var sysctlChecks = []sysctlCheck{
 		penalty:  5,
 	},
 	{
-		key: "net.ipv4.tcp_syncookies", badVal: "0",
+		key: "net.ipv4.tcp_syncookies", badVal: "0", goodVal: "1",
 		severity: model.SeverityWarning,
 		title:    "SYN cookies disabled",
 		desc:     "Host is vulnerable to SYN flood attacks.",
@@ -71,7 +72,7 @@ var sysctlChecks = []sysctlCheck{
 		penalty:  10,
 	},
 	{
-		key: "kernel.randomize_va_space", badVal: "0",
+		key: "kernel.randomize_va_space", badVal: "0", goodVal: "2",
 		severity: model.SeverityCritical,
 		title:    "ASLR disabled (kernel.randomize_va_space=0)",
 		desc:     "Address Space Layout Randomization is off — memory exploitation is significantly easier.",
@@ -102,6 +103,16 @@ func (r *SysctlRule) Evaluate(snapshot model.Snapshot) []model.Finding {
 			Description:    chk.desc,
 			Recommendation: chk.fix,
 			Penalty:        chk.penalty,
+			Fix: &model.Fix{
+				Description: fmt.Sprintf("Set %s=%s (apply + persist)", chk.key, chk.goodVal),
+				Actions: []model.Action{
+					{
+						Kind:  model.ActionSysctlSet,
+						Key:   chk.key,
+						Value: chk.goodVal,
+					},
+				},
+			},
 		})
 	}
 	return findings

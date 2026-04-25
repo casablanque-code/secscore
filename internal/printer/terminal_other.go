@@ -3,9 +3,9 @@
 package printer
 
 func isTerminal(fd uintptr) bool {
-return false
+	return false
 }
 
 func terminalWidth(fd uintptr) int {
-return 80
+	return 80
 }

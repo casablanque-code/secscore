@@ -46,6 +46,12 @@ func (r *UFWCorrelationRule) Evaluate(snapshot model.Snapshot) []model.Finding {
 			Description:    "Host firewall is disabled. All ports are accessible from the network.",
 			Recommendation: "Run: ufw enable (ensure SSH rule exists first to avoid lockout)",
 			Penalty:        25,
+			Fix: &model.Fix{
+				Description: "Enable ufw firewall",
+				Actions: []model.Action{
+					{Kind: model.ActionCommand, Cmd: []string{"ufw", "--force", "enable"}},
+				},
+			},
 		})
 		return findings
 	}
@@ -87,6 +93,15 @@ func (r *UFWCorrelationRule) Evaluate(snapshot model.Snapshot) []model.Finding {
 					l.Port, proto, l.Port, proto, l.Port, proto,
 				),
 				Penalty: 8,
+				Fix: &model.Fix{
+					Description: fmt.Sprintf("Add ufw allow rule for port %d/%s", l.Port, proto),
+					Actions: []model.Action{
+						{
+							Kind: model.ActionCommand,
+							Cmd:  []string{"ufw", "allow", fmt.Sprintf("%d/%s", l.Port, proto)},
+						},
+					},
+				},
 			})
 
 		case matched.Action == "DENY" || matched.Action == "REJECT":

@@ -21,6 +21,7 @@ type Finding struct {
 	Recommendation string
 	Penalty        int
 	Evidence       []Evidence
+	Fix            *Fix // nil if no automated fix is available
 }
 
 type ServiceType string
