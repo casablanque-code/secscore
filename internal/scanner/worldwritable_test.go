@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// skipIfWSL2 skips the test on WSL2 where chmod o+w is not reliably supported.
+// skipIfWSL2 skips the test on WSL2.
 func skipIfWSL2(t *testing.T) {
 	t.Helper()
 	if isWSL2() {
-		t.Skip("skipping on WSL2: filesystem does not reliably support o+w permissions")
+		t.Skip("skipping on WSL2: filesystem may not support o+w permissions reliably")
 	}
 }
 
@@ -21,11 +21,19 @@ func TestWorldWritable_DetectsOtherWrite(t *testing.T) {
 	dir := t.TempDir()
 
 	ww := filepath.Join(dir, "dangerous.sh")
-	if err := os.WriteFile(ww, []byte("#!/bin/bash\n"), 0777); err != nil {
+	if err := os.WriteFile(ww, []byte("#!/bin/bash\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	// chmod explicitly — WriteFile respects umask, chmod does not
+	if err := os.Chmod(ww, 0777); err != nil {
+		t.Fatal(err)
+	}
+
 	normal := filepath.Join(dir, "normal.sh")
-	if err := os.WriteFile(normal, []byte("#!/bin/bash\n"), 0755); err != nil {
+	if err := os.WriteFile(normal, []byte("#!/bin/bash\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(normal, 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,9 +56,13 @@ func TestWorldWritable_SkipsSymlinks(t *testing.T) {
 	dir := t.TempDir()
 
 	real := filepath.Join(dir, "real.sh")
-	if err := os.WriteFile(real, []byte("x"), 0755); err != nil {
+	if err := os.WriteFile(real, []byte("x"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(real, 0755); err != nil {
+		t.Fatal(err)
+	}
+
 	link := filepath.Join(dir, "link.sh")
 	if err := os.Symlink(real, link); err != nil {
 		t.Fatal(err)
@@ -66,7 +78,6 @@ func TestWorldWritable_SkipsSymlinks(t *testing.T) {
 }
 
 func TestWorldWritable_SkipsAlternatives(t *testing.T) {
-	// shouldSkipWW uses wwSkipPaths — no filesystem access, runs on any platform
 	cases := []struct {
 		path string
 		want bool
@@ -102,7 +113,11 @@ func TestWorldWritable_NormalPerms_NoFindings(t *testing.T) {
 		{"config.conf", 0644},
 		{"private.key", 0600},
 	} {
-		if err := os.WriteFile(filepath.Join(dir, f.name), []byte("x"), f.mode); err != nil {
+		path := filepath.Join(dir, f.name)
+		if err := os.WriteFile(path, []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, f.mode); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -119,8 +134,11 @@ func TestWorldWritable_MaxResultsCap(t *testing.T) {
 	dir := t.TempDir()
 
 	for i := 0; i < 30; i++ {
-		name := filepath.Join(dir, fmt.Sprintf("file%d.sh", i))
-		_ = os.WriteFile(name, []byte("x"), 0777)
+		path := filepath.Join(dir, fmt.Sprintf("file%d.sh", i))
+		if err := os.WriteFile(path, []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		_ = os.Chmod(path, 0777)
 	}
 
 	found := findWorldWritable([]string{dir}, nil, 5)
