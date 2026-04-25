@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 // UFWCorrelationRule correlates ss listeners with ufw rules.

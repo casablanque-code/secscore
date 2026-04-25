@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func TestCalculateScore_NoPenalties(t *testing.T) {

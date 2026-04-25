@@ -5,7 +5,7 @@ import (
 "net/http"
 "time"
 
-"secscore/internal/model"
+"github.com/casablanque-code/secscore/internal/model"
 )
 
 type HTTPAuthRule struct{}

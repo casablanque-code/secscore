@@ -3,18 +3,28 @@ package engine
 import (
 	"sort"
 
-	"secscore/internal/model"
-	"secscore/internal/rule"
-	"secscore/internal/scanner"
+	"github.com/casablanque-code/secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/rule"
+	"github.com/casablanque-code/secscore/internal/scanner"
 )
+
+// ProgressFunc is called before each scanner runs. Used for live progress output.
+type ProgressFunc func(scannerName string)
 
 type Engine struct {
 	scanners []scanner.Scanner
 	rules    []rule.Rule
+	progress ProgressFunc
 }
 
 func New(scanners []scanner.Scanner, rules []rule.Rule) *Engine {
 	return &Engine{scanners: scanners, rules: rules}
+}
+
+// WithProgress sets a callback that is called before each scanner runs.
+func (e *Engine) WithProgress(fn ProgressFunc) *Engine {
+	e.progress = fn
+	return e
 }
 
 func (e *Engine) Run(isRoot bool) (model.Report, error) {
@@ -24,6 +34,9 @@ func (e *Engine) Run(isRoot bool) (model.Report, error) {
 	}
 
 	for _, s := range e.scanners {
+		if e.progress != nil {
+			e.progress(s.Name())
+		}
 		if err := s.Scan(&snapshot); err != nil {
 			return model.Report{}, err
 		}
@@ -45,9 +58,6 @@ func (e *Engine) Run(isRoot bool) (model.Report, error) {
 	}, nil
 }
 
-// calculateScore: start at 100, apply all penalties (positive = bad, negative = bonus).
-// Score is clamped to [0, 100].
-// Bonuses can push score back up, but only to 100 maximum.
 func calculateScore(findings []model.Finding) int {
 	score := 100
 	for _, f := range findings {

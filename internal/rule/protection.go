@@ -3,7 +3,7 @@ package rule
 import (
 	"fmt"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 // ProtectionRule gives positive score for services correctly bound to localhost.

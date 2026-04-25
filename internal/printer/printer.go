@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 const (
@@ -30,69 +30,77 @@ func isTerminal(fd uintptr) bool {
 }
 
 func terminalWidth(fd uintptr) int {
-	type winsize struct {
-		Row, Col, Xpixel, Ypixel uint16
-	}
+	type winsize struct{ Row, Col, Xpixel, Ypixel uint16 }
 	var ws winsize
-	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, 0x5413 /* TIOCGWINSZ */, uintptr(unsafe.Pointer(&ws)))
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, 0x5413, uintptr(unsafe.Pointer(&ws)))
 	if err == 0 && ws.Col > 0 {
 		return int(ws.Col)
 	}
 	return 80
 }
 
-type p struct {
+type pr struct {
 	w     io.Writer
 	color bool
 	width int
 }
 
-func newP(w io.Writer) *p {
-	pr := &p{w: w, width: 80}
+func newPr(w io.Writer) *pr {
+	p := &pr{w: w, width: 80}
 	if f, ok := w.(*os.File); ok {
 		fd := f.Fd()
-		pr.color = isTerminal(fd)
-		if pr.color {
-			pr.width = terminalWidth(fd)
+		p.color = isTerminal(fd)
+		if p.color {
+			p.width = terminalWidth(fd)
 		}
 	}
-	// cap width for readability
-	if pr.width > 100 {
-		pr.width = 100
+	if p.width > 100 {
+		p.width = 100
 	}
-	return pr
+	return p
 }
 
-func (pr *p) c(code, text string) string {
-	if !pr.color {
+func (p *pr) c(code, text string) string {
+	if !p.color {
 		return text
 	}
 	return code + text + colorReset
 }
 
-func (pr *p) rule(char string) string {
-	return strings.Repeat(char, pr.width)
+func (p *pr) rule(char string) string {
+	return strings.Repeat(char, p.width)
 }
 
-func (pr *p) severityStyle(s model.Severity) (icon, col string) {
-	switch s {
-	case model.SeverityCritical:
-		return "✖", colorRed
-	case model.SeverityWarning:
-		return "▲", colorYellow
-	default:
-		return "●", colorCyan
+// PrintProgress writes a single scanning status line, overwriting the previous one.
+// Call PrintProgressDone when scanning is complete to move to a new line.
+func PrintProgress(w io.Writer, scannerName string) {
+	p := newPr(w)
+	if !p.color {
+		return // don't clutter non-tty output
 	}
+	fmt.Fprintf(w, "\r  %s scanning %-16s",
+		p.c(colorDim, "▸"),
+		p.c(colorDim, scannerName+"..."),
+	)
+}
+
+// PrintProgressDone clears the progress line.
+func PrintProgressDone(w io.Writer) {
+	p := newPr(w)
+	if !p.color {
+		return
+	}
+	fmt.Fprintf(w, "\r%s\r", strings.Repeat(" ", p.width))
 }
 
 func PrintReport(w io.Writer, report model.Report) {
-	pr := newP(w)
+	p := newPr(w)
 
 	// ── Header ───────────────────────────────────────────────────────────────
-	fmt.Fprintln(pr.w, pr.c(colorDim, pr.rule("─")))
-	fmt.Fprintf(pr.w, "  %s\n", pr.c(colorBold+colorWhite, "secscore  —  local security report"))
-	fmt.Fprintln(pr.w, pr.c(colorDim, pr.rule("─")))
-	fmt.Fprintln(pr.w)
+	fmt.Fprintln(p.w, p.c(colorDim, p.rule("─")))
+	fmt.Fprintf(p.w, "  %s\n", p.c(colorBold+colorWhite, "secscore  —  local security report"))
+	fmt.Fprintln(p.w, p.c(colorDim, p.rule("─")))
+	fmt.Fprintln(p.w)
 
 	// ── Score bar ────────────────────────────────────────────────────────────
 	score := report.Score
@@ -113,42 +121,41 @@ func PrintReport(w io.Writer, report model.Report) {
 	if filled > barWidth {
 		filled = barWidth
 	}
-	bar := strings.Repeat("█", filled) + pr.c(colorDim, strings.Repeat("░", barWidth-filled))
+	bar := strings.Repeat("█", filled) + p.c(colorDim, strings.Repeat("░", barWidth-filled))
 
-	fmt.Fprintf(pr.w, "  Score   %s  %s  %s\n",
-		pr.c(scoreColor+colorBold, fmt.Sprintf("%3d/100", score)),
+	fmt.Fprintf(p.w, "  Score   %s  %s  %s\n",
+		p.c(scoreColor+colorBold, fmt.Sprintf("%3d/100", score)),
 		bar,
-		pr.c(scoreColor, scoreLabel),
+		p.c(scoreColor, scoreLabel),
 	)
-	fmt.Fprintln(pr.w)
+	fmt.Fprintln(p.w)
 
 	// ── Summary counts ───────────────────────────────────────────────────────
-	var critical, warnings, info int
+	var nCritical, nWarning, nInfo int
 	for _, f := range report.Findings {
 		switch f.Severity {
 		case model.SeverityCritical:
-			critical++
+			nCritical++
 		case model.SeverityWarning:
-			warnings++
+			nWarning++
 		default:
-			info++
+			nInfo++
 		}
 	}
 
-	fmt.Fprintf(pr.w, "  %s   %s   %s\n",
-		pr.c(colorRed+colorBold, fmt.Sprintf("✖  %d critical", critical)),
-		pr.c(colorYellow+colorBold, fmt.Sprintf("▲  %d warning", warnings)),
-		pr.c(colorCyan, fmt.Sprintf("●  %d info", info)),
+	fmt.Fprintf(p.w, "  %s   %s   %s\n",
+		p.c(colorRed+colorBold, fmt.Sprintf("✖  %d critical", nCritical)),
+		p.c(colorYellow+colorBold, fmt.Sprintf("▲  %d warning", nWarning)),
+		p.c(colorCyan, fmt.Sprintf("●  %d info", nInfo)),
 	)
 
 	if len(report.Findings) == 0 {
-		fmt.Fprintln(pr.w)
-		fmt.Fprintf(pr.w, "\n  %s\n\n", pr.c(colorGreen+colorBold, "✔  No issues found."))
-		fmt.Fprintln(pr.w, pr.c(colorDim, pr.rule("─")))
+		fmt.Fprintf(p.w, "\n  %s\n\n", p.c(colorGreen+colorBold, "✔  No issues found."))
+		fmt.Fprintln(p.w, p.c(colorDim, p.rule("─")))
 		return
 	}
 
-	// ── Sections ─────────────────────────────────────────────────────────────
+	// ── Findings grouped: severity first, then by category ───────────────────
 	sections := []struct {
 		sev   model.Severity
 		label string
@@ -160,53 +167,134 @@ func PrintReport(w io.Writer, report model.Report) {
 	}
 
 	for _, sec := range sections {
-		var group []model.Finding
-		for _, f := range report.Findings {
-			if f.Severity == sec.sev {
-				group = append(group, f)
-			}
-		}
-		if len(group) == 0 {
+		// Group findings in this severity by category
+		byCategory := groupByCategory(report.Findings, sec.sev)
+		if len(byCategory) == 0 {
 			continue
 		}
 
-		fmt.Fprintln(pr.w)
-		fmt.Fprintln(pr.w, pr.c(sec.col+colorBold, pr.rule("─")))
-		fmt.Fprintf(pr.w, "%s\n", pr.c(sec.col+colorBold, sec.label))
-		fmt.Fprintln(pr.w, pr.c(sec.col+colorBold, pr.rule("─")))
+		fmt.Fprintln(p.w)
+		fmt.Fprintln(p.w, p.c(sec.col+colorBold, p.rule("─")))
+		fmt.Fprintf(p.w, "%s\n", p.c(sec.col+colorBold, sec.label))
+		fmt.Fprintln(p.w, p.c(sec.col+colorBold, p.rule("─")))
 
-		for _, f := range group {
-			icon, col := pr.severityStyle(f.Severity)
-
-			fmt.Fprintln(pr.w)
-			// Title line
-			fmt.Fprintf(pr.w, "  %s  %s\n",
-				pr.c(col+colorBold, icon),
-				pr.c(colorBold, f.Title),
-			)
-			// Description
-			fmt.Fprintf(pr.w, "     %s\n",
-				pr.c(colorDim, wordWrap(f.Description, pr.width-6)),
-			)
-			// Fix
-			fmt.Fprintf(pr.w, "     %s  %s\n",
-				pr.c(colorGray, "fix:"),
-				wordWrap(f.Recommendation, pr.width-11),
-			)
-			// Evidence
-			for _, ev := range f.Evidence {
-				fmt.Fprintf(pr.w, "     %s  %s  %s\n",
-					pr.c(colorGray, "src:"),
-					pr.c(colorDim, ev.Source),
-					pr.c(colorDim, truncate(ev.Details, 60)),
-				)
+		// Print categories in order
+		for _, cat := range categoryOrder {
+			findings, ok := byCategory[cat]
+			if !ok {
+				continue
+			}
+			// Category header if more than one category present
+			if len(byCategory) > 1 {
+				fmt.Fprintf(p.w, "\n  %s\n", p.c(colorGray, categoryLabel(cat)))
+			}
+			for _, f := range findings {
+				printFinding(p, f)
 			}
 		}
 	}
 
-	fmt.Fprintln(pr.w)
-	fmt.Fprintln(pr.w, pr.c(colorDim, pr.rule("─")))
-	fmt.Fprintln(pr.w)
+	fmt.Fprintln(p.w)
+	fmt.Fprintln(p.w, p.c(colorDim, p.rule("─")))
+	fmt.Fprintln(p.w)
+}
+
+func printFinding(p *pr, f model.Finding) {
+	var icon, col string
+	switch f.Severity {
+	case model.SeverityCritical:
+		icon, col = "✖", colorRed
+	case model.SeverityWarning:
+		icon, col = "▲", colorYellow
+	default:
+		icon, col = "●", colorCyan
+	}
+
+	fmt.Fprintln(p.w)
+	fmt.Fprintf(p.w, "  %s  %s\n",
+		p.c(col+colorBold, icon),
+		p.c(colorBold, f.Title),
+	)
+	fmt.Fprintf(p.w, "     %s\n", p.c(colorDim, wordWrap(f.Description, p.width-6)))
+	fmt.Fprintf(p.w, "     %s  %s\n",
+		p.c(colorGray, "fix:"),
+		wordWrap(f.Recommendation, p.width-11),
+	)
+	for _, ev := range f.Evidence {
+		fmt.Fprintf(p.w, "     %s  %s  %s\n",
+			p.c(colorGray, "src:"),
+			p.c(colorDim, ev.Source),
+			p.c(colorDim, truncate(ev.Details, 60)),
+		)
+	}
+}
+
+// category classification
+
+type category int
+
+const (
+	catSSH category = iota
+	catFirewall
+	catDocker
+	catKernel
+	catSudo
+	catFiles
+	catOther
+)
+
+var categoryOrder = []category{catSSH, catFirewall, catDocker, catKernel, catSudo, catFiles, catOther}
+
+func categoryLabel(c category) string {
+	switch c {
+	case catSSH:
+		return "SSH"
+	case catFirewall:
+		return "Firewall"
+	case catDocker:
+		return "Docker / Services"
+	case catKernel:
+		return "Kernel (sysctl)"
+	case catSudo:
+		return "Sudo"
+	case catFiles:
+		return "Filesystem"
+	default:
+		return "Other"
+	}
+}
+
+func findingCategory(f model.Finding) category {
+	id := f.ID
+	switch {
+	case strings.HasPrefix(id, "sshd-"):
+		return catSSH
+	case strings.HasPrefix(id, "ufw-"):
+		return catFirewall
+	case strings.HasPrefix(id, "exposed-") || strings.HasPrefix(id, "protected-") ||
+		strings.HasPrefix(id, "proxy-") || strings.HasPrefix(id, "http-"):
+		return catDocker
+	case strings.HasPrefix(id, "sysctl-"):
+		return catKernel
+	case strings.HasPrefix(id, "sudo-"):
+		return catSudo
+	case strings.HasPrefix(id, "world-writable"):
+		return catFiles
+	default:
+		return catOther
+	}
+}
+
+func groupByCategory(findings []model.Finding, sev model.Severity) map[category][]model.Finding {
+	result := make(map[category][]model.Finding)
+	for _, f := range findings {
+		if f.Severity != sev {
+			continue
+		}
+		cat := findingCategory(f)
+		result[cat] = append(result[cat], f)
+	}
+	return result
 }
 
 func wordWrap(text string, width int) string {
@@ -216,6 +304,7 @@ func wordWrap(text string, width int) string {
 	words := strings.Fields(text)
 	var lines []string
 	line := ""
+	indent := strings.Repeat(" ", 9)
 	for _, w := range words {
 		if line == "" {
 			line = w
@@ -223,7 +312,7 @@ func wordWrap(text string, width int) string {
 			line += " " + w
 		} else {
 			lines = append(lines, line)
-			line = strings.Repeat(" ", 9) + w // indent continuation
+			line = indent + w
 		}
 	}
 	if line != "" {

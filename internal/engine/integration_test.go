@@ -3,9 +3,9 @@ package engine
 import (
 	"testing"
 
-	"secscore/internal/model"
-	"secscore/internal/rule"
-	"secscore/internal/scanner"
+	"github.com/casablanque-code/secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/rule"
+	"github.com/casablanque-code/secscore/internal/scanner"
 )
 
 // fakeScanner allows injecting a pre-built snapshot for engine integration tests.

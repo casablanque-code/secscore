@@ -7,35 +7,28 @@ import (
 	"os"
 	"path/filepath"
 
-	"secscore/internal/engine"
-	"secscore/internal/model"
-	"secscore/internal/printer"
-	"secscore/internal/rule"
-	"secscore/internal/scanner"
-	"secscore/internal/version"
+	"github.com/casablanque-code/secscore/internal/engine"
+	"github.com/casablanque-code/secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/printer"
+	"github.com/casablanque-code/secscore/internal/rule"
+	"github.com/casablanque-code/secscore/internal/scanner"
+	"github.com/casablanque-code/secscore/internal/version"
 )
 
 func main() {
 	var jsonOutput bool
 	var only string
-	var help bool
 	var showVersion bool
 	var profilesPath string
 
 	flag.BoolVar(&jsonOutput, "json", false, "output in JSON format")
 	flag.StringVar(&only, "only", "", "run only specific scanner: docker, ss, ufw, sshd, sysctl, sudo, world-writable")
 	flag.StringVar(&profilesPath, "profiles", "", "path to profiles.yaml (default: next to binary)")
-	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&showVersion, "version", false, "print version and exit")
 	flag.Parse()
 
 	if showVersion {
 		fmt.Printf("secscore %s\n", version.Version)
-		return
-	}
-
-	if help {
-		printHelp()
 		return
 	}
 
@@ -51,6 +44,7 @@ func main() {
 	}
 	if err := model.LoadProfiles(profilesPath); err != nil && !jsonOutput {
 		fmt.Fprintf(os.Stderr, "⚠  profiles.yaml not loaded: %v\n", err)
+		fmt.Fprintln(os.Stderr)
 	}
 
 	scanners := buildScanners(only)
@@ -67,11 +61,22 @@ func main() {
 	}
 
 	eng := engine.New(scanners, rules)
+
+	// Show live progress on terminal, skip for JSON output
+	if !jsonOutput {
+		eng.WithProgress(func(name string) {
+			printer.PrintProgress(os.Stderr, name)
+		})
+	}
+
 	report, err := eng.Run(isRoot)
 	if err != nil {
+		printer.PrintProgressDone(os.Stderr)
 		fmt.Fprintf(os.Stderr, "secscore: %v\n", err)
 		os.Exit(1)
 	}
+
+	printer.PrintProgressDone(os.Stderr)
 
 	if jsonOutput {
 		_ = json.NewEncoder(os.Stdout).Encode(report)
@@ -90,11 +95,11 @@ func main() {
 
 func buildScanners(only string) []scanner.Scanner {
 	all := map[string]scanner.Scanner{
-		"docker": scanner.NewDockerScanner(),
-		"ss":     scanner.NewSSScanner(),
-		"ufw":    scanner.NewUFWScanner(),
-		"sshd":   scanner.NewSSHDScanner(),
-		"sysctl": scanner.NewSysctlScanner(),
+		"docker":        scanner.NewDockerScanner(),
+		"ss":            scanner.NewSSScanner(),
+		"ufw":           scanner.NewUFWScanner(),
+		"sshd":          scanner.NewSSHDScanner(),
+		"sysctl":        scanner.NewSysctlScanner(),
 		"sudo":          scanner.NewSudoScanner(),
 		"world-writable": scanner.NewWorldWritableScanner(),
 	}
@@ -127,26 +132,4 @@ func resolveProfilesPath() string {
 		}
 	}
 	return "profiles.yaml"
-}
-
-func printHelp() {
-	fmt.Printf(`secscore %s — local security analyzer
-
-Usage:
-  secscore [flags]
-
-Flags:
-  --json              Output report as JSON
-  --only <scanner>    Run only one scanner: docker, ss, ufw, sshd, sysctl, sudo
-  --profiles <path>   Path to profiles.yaml
-  --version           Print version and exit
-  --help              Show this help
-
-Exit codes:
-  0  No issues found
-  1  Warnings present
-  2  Critical issues found
-
-Note: run with sudo for full results (ss process info, sysctl, sudoers).
-`, version.Version)
 }

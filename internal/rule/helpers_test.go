@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 // assertFinding checks that a finding with the given ID and severity exists.

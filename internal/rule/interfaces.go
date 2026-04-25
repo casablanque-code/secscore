@@ -1,6 +1,6 @@
 package rule
 
-import "secscore/internal/model"
+import "github.com/casablanque-code/secscore/internal/model"
 
 type Rule interface {
 Name() string

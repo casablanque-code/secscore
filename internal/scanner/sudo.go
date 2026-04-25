@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 type SudoScanner struct{}

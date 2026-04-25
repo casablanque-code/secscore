@@ -3,7 +3,7 @@ package scanner
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func TestParseUFWOutput_Active(t *testing.T) {

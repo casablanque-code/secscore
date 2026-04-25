@@ -1,4 +1,4 @@
-module secscore
+module github.com/casablanque-code/secscore
 
 go 1.22
 

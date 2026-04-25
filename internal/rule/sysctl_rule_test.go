@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func TestSysctlRule_ASLRDisabled_Critical(t *testing.T) {

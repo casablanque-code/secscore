@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 type DockerScanner struct{}

@@ -4,7 +4,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 type SysctlScanner struct{}

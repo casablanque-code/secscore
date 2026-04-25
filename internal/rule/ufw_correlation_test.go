@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func TestUFWCorrelation_Inactive(t *testing.T) {

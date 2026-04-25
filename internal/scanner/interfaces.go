@@ -1,6 +1,6 @@
 package scanner
 
-import "secscore/internal/model"
+import "github.com/casablanque-code/secscore/internal/model"
 
 type Scanner interface {
 	Name() string

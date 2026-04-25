@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func TestSudoRule_NopasswdAll_Critical(t *testing.T) {

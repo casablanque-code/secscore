@@ -1,6 +1,8 @@
-# Binaries
-/secscore
-/secscore-*
+# Binary
+secscore
+secscore-*
+
+# Build artifacts
 dist/
 
 # Go

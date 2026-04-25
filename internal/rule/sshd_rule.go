@@ -3,7 +3,7 @@ package rule
 import (
 	"fmt"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 type SSHDRule struct{}

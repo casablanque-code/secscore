@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 func sshdSnap(cfg model.SSHDConfig) model.Snapshot {

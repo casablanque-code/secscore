@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"secscore/internal/model"
+	"github.com/casablanque-code/secscore/internal/model"
 )
 
 type SSHDScanner struct{}
